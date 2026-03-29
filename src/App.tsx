@@ -11,7 +11,7 @@ function App() {
 
   return (
     <div className="app-container" style={{ background: '#FFFFFF', color: '#1E293B', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
-      <h1 style={{ color: '#0F172A', marginBottom: '20px' }}>DictateFlow</h1>
+      <h1 style={{ color: '#0F172A', marginBottom: '20px' }}>VocalWrite</h1>
       <button 
         onClick={toggleRecording}
         style={{

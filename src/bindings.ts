@@ -396,7 +396,7 @@ async getAvailableAccelerators() : Promise<AvailableAccelerators> {
 /**
  * Start key recording mode
  */
-async startHandyKeysRecording(bindingId: string) : Promise<Result<null, string>> {
+async startVocalWriteKeysRecording(bindingId: string) : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("start_handy_keys_recording", { bindingId }) };
 } catch (e) {
@@ -407,7 +407,7 @@ async startHandyKeysRecording(bindingId: string) : Promise<Result<null, string>>
 /**
  * Stop key recording mode
  */
-async stopHandyKeysRecording() : Promise<Result<null, string>> {
+async stopVocalWriteKeysRecording() : Promise<Result<null, string>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("stop_handy_keys_recording") };
 } catch (e) {

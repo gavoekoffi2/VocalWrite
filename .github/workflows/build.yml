@@ -12,11 +12,11 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
       - name: Install Vulkan SDK
-        uses: humblepenguinn/setup-vulkan-sdk@v1.2.0
-        with:
-          vulkan-query-version: 1.3.268.0
-          vulkan-components: Vulkan-Headers, Vulkan-Loader
-          vulkan-use-cache: true
+        run: |
+          choco install vulkan-sdk -y
+          $vulkanPath = (Get-ChildItem -Path "C:\VulkanSDK" -Directory | Select-Object -First 1).FullName
+          echo "VULKAN_SDK=$vulkanPath" >> $env:GITHUB_ENV
+          echo "$vulkanPath\Bin" >> $env:GITHUB_PATH
       - name: Install dependencies (bun)
         uses: oven-sh/setup-bun@v1
       - name: Install Tauri dependencies
@@ -26,5 +26,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VocalWrite-Windows
+          name: Voxflow-Windows
           path: src-tauri/target/release/bundle/nsis/*.exe

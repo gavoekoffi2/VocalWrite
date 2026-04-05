@@ -25,6 +25,8 @@ jobs:
           echo "$vulkanPath\Bin" >> $env:GITHUB_PATH
       - name: Install dependencies (bun)
         uses: oven-sh/setup-bun@v1
+      - name: Install Packaging Tools
+        run: choco install nsis wixtoolset -y
       - name: Install Tauri dependencies
         run: bun install
       - name: Build App

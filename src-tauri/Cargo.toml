@@ -1,11 +1,11 @@
 [package]
-name = "voxflow"
+name = "domefa_ai"
 version = "0.8.1"
 description = "VocalWrite"
 authors = ["cjpais"]
 edition = "2021"
 license = "MIT"
-default-run = "voxflow"
+default-run = "domefa_ai"
 
 [profile.dev]
 incremental = true # Compile your binary in smaller steps.

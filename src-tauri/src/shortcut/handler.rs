@@ -1,22 +1,11 @@
-use tauri::{AppHandle, Manager};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
-use winit::keyboard::{KeyCode, ModifiersState};
+use tauri::AppHandle;
+use log::debug;
 
-pub fn setup_shortcut(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    let shortcut = app.global_shortcut();
-    
-    // Ctrl + Space
-    let trigger = tauri_plugin_global_shortcut::Shortcut::new(
-        Some(ModifiersState::CONTROL),
-        KeyCode::Space,
-    );
-
-    shortcut.register(trigger)?;
-    
-    app.listen_global("shortcut", move |event| {
-        // Logique de Start/Stop à déclencher ici
-        println!("Shortcut pressed!");
-    });
-
-    Ok(())
+// Remplacement fonctionnel pour Tauri v2
+pub fn handle_shortcut_event(app: &AppHandle, binding_id: &str, shortcut: &str, is_pressed: bool) {
+    if is_pressed {
+        debug!("Shortcut pressed: {} ({})", shortcut, binding_id);
+        // On envoie un évènement générique au frontend
+        let _ = tauri::Emitter::emit(app, "shortcut-pressed", binding_id);
+    }
 }

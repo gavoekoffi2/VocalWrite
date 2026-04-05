@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voxflow",
+  "productName": "Domefa AI",
   "version": "0.8.1",
   "identifier": "com.pais.handy",
   "build": {

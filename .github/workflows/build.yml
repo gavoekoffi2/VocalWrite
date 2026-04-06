@@ -26,7 +26,10 @@ jobs:
       - name: Install dependencies (bun)
         uses: oven-sh/setup-bun@v1
       - name: Install Packaging Tools
-        run: choco install nsis wixtoolset -y
+        run: |
+          choco install nsis wixtoolset -y
+          echo "C:\Program Files (x86)\NSIS" >> $env:GITHUB_PATH
+          echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
       - name: Install Tauri dependencies
         run: bun install
       - name: Build App

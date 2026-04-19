@@ -14,8 +14,44 @@
     "advanced": "Advanced",
     "postProcessing": "Post Process",
     "history": "History",
+    "subscription": "Subscription",
     "debug": "Debug",
     "about": "About"
+  },
+  "subscription": {
+    "title": "Your plan",
+    "currentPlan": "Current plan",
+    "account": "Account",
+    "expiresOn": "Expires on",
+    "quotaLabel": "Monthly quota",
+    "chars": "characters",
+    "tier": {
+      "free": "Free",
+      "premium": "Premium (annual)",
+      "adminFree": "Admin (lifetime)"
+    },
+    "unlimitedNote": "Unlimited transcription is active. Thank you for supporting Vocrit AI.",
+    "adminFreeNote": "This account has lifetime access granted by the administrator.",
+    "subscribeTitle": "Subscribe",
+    "subscribeBlurb": "Get unlimited transcription for {{price}} {{currency}} per year. Pay securely with mobile money through Money Fusion.",
+    "emailLabel": "Email",
+    "phoneLabel": "Phone number",
+    "payCta": "Pay with mobile money",
+    "processing": "Processing…",
+    "verifyPayment": "I have paid — verify",
+    "licenseTitle": "Already have a license key?",
+    "licenseBlurb": "Enter the license key you received by email to activate Premium on this device.",
+    "licenseKeyLabel": "License key",
+    "activateCta": "Activate license",
+    "deactivateCta": "Sign out",
+    "errorPrefix": "Error"
+  },
+  "paywall": {
+    "title": "Free quota reached",
+    "description": "You have used all the free characters for this month. Subscribe to keep dictating without limits.",
+    "clipboardNotice": "Your last transcript ({{count}} characters) has been copied to the clipboard so you can paste it once you subscribe.",
+    "dismiss": "Later",
+    "subscribeCta": "Subscribe"
   },
   "onboarding": {
     "subtitle": "To get started, choose a transcription model",

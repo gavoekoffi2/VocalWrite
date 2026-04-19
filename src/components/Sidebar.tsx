@@ -1,6 +1,14 @@
 import React from "react";
 import { useTranslation } from "react-i18next";
-import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
+import {
+  Cog,
+  FlaskConical,
+  History,
+  Info,
+  Sparkles,
+  Cpu,
+  CreditCard,
+} from "lucide-react";
 import VocalWriteTextLogo from "./icons/VocalWriteTextLogo";
 import VocalWriteHand from "./icons/VocalWriteHand";
 import { useSettings } from "../hooks/useSettings";
@@ -12,6 +20,7 @@ import {
   AboutSettings,
   PostProcessingSettings,
   ModelsSettings,
+  SubscriptionSettings,
 } from "./settings";
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
@@ -61,6 +70,12 @@ export const SECTIONS_CONFIG = {
     icon: Sparkles,
     component: PostProcessingSettings,
     enabled: (settings) => settings?.post_process_enabled ?? false,
+  },
+  subscription: {
+    labelKey: "sidebar.subscription",
+    icon: CreditCard,
+    component: SubscriptionSettings,
+    enabled: () => true,
   },
   debug: {
     labelKey: "sidebar.debug",

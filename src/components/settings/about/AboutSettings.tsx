@@ -29,7 +29,7 @@ export const AboutSettings: React.FC = () => {
 
   const handleDonateClick = async () => {
     try {
-      await openUrl("https://handy.computer/donate");
+      await openUrl("https://vocrit.ai/donate");
     } catch (error) {
       console.error("Failed to open donate link:", error);
     }

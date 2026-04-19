@@ -14,8 +14,44 @@
     "advanced": "Avancé",
     "postProcessing": "Post-traitement",
     "history": "Historique",
+    "subscription": "Abonnement",
     "debug": "Débogage",
     "about": "À propos"
+  },
+  "subscription": {
+    "title": "Votre formule",
+    "currentPlan": "Formule actuelle",
+    "account": "Compte",
+    "expiresOn": "Expire le",
+    "quotaLabel": "Quota mensuel",
+    "chars": "caractères",
+    "tier": {
+      "free": "Gratuit",
+      "premium": "Premium (annuel)",
+      "adminFree": "Admin (à vie)"
+    },
+    "unlimitedNote": "La transcription illimitée est active. Merci de soutenir Vocrit AI.",
+    "adminFreeNote": "Ce compte bénéficie d'un accès à vie accordé par l'administrateur.",
+    "subscribeTitle": "S'abonner",
+    "subscribeBlurb": "Profitez de la transcription illimitée pour {{price}} {{currency}} par an. Paiement sécurisé par Mobile Money via Money Fusion.",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Numéro de téléphone",
+    "payCta": "Payer par Mobile Money",
+    "processing": "Traitement…",
+    "verifyPayment": "J'ai payé — vérifier",
+    "licenseTitle": "Vous avez déjà une clé de licence ?",
+    "licenseBlurb": "Saisissez la clé de licence reçue par e-mail pour activer Premium sur cet appareil.",
+    "licenseKeyLabel": "Clé de licence",
+    "activateCta": "Activer la licence",
+    "deactivateCta": "Se déconnecter",
+    "errorPrefix": "Erreur"
+  },
+  "paywall": {
+    "title": "Quota gratuit atteint",
+    "description": "Vous avez utilisé tous les caractères gratuits de ce mois. Abonnez-vous pour continuer à dicter sans limite.",
+    "clipboardNotice": "Votre dernière transcription ({{count}} caractères) a été copiée dans le presse-papiers ; vous pourrez la coller dès que votre abonnement sera actif.",
+    "dismiss": "Plus tard",
+    "subscribeCta": "S'abonner"
   },
   "onboarding": {
     "subtitle": "Pour commencer, choisissez un modèle de transcription",

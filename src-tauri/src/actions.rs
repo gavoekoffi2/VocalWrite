@@ -510,7 +510,7 @@ impl ShortcutAction for TranscribeAction {
                 } else {
                     // Save WAV concurrently with transcription
                     let sample_count = samples.len();
-                    let file_name = format!("handy-{}.wav", chrono::Utc::now().timestamp());
+                    let file_name = format!("vocrit-{}.wav", chrono::Utc::now().timestamp());
                     let wav_path = hm.recordings_dir().join(&file_name);
                     let wav_path_for_verify = wav_path.clone();
                     let samples_for_wav = samples.clone();
@@ -578,6 +578,40 @@ impl ShortcutAction for TranscribeAction {
                                 utils::hide_recording_overlay(&ah);
                                 change_tray_icon(&ah, TrayIconState::Idle);
                             } else {
+                                // Quota gate: block the paste if the user has
+                                // exhausted their free tier and has no active
+                                // subscription. We still keep the history entry
+                                // so they can copy it manually after upgrading.
+                                let char_count = processed.final_text.chars().count() as u64;
+                                match crate::subscription::try_consume_chars(&ah, char_count) {
+                                    Ok(status) => {
+                                        let _ = ah.emit("subscription-status-changed", &status);
+                                    }
+                                    Err(msg) => {
+                                        warn!("Paste blocked by quota: {msg}");
+                                        use tauri_plugin_clipboard_manager::ClipboardExt;
+                                        let _ = ah.clipboard().write_text(processed.final_text.clone());
+                                        let _ = ah.emit(
+                                            "subscription-paywall-required",
+                                            serde_json::json!({
+                                                "reason": msg,
+                                                "blocked_text_length": char_count,
+                                                "transcript_in_clipboard": true,
+                                            }),
+                                        );
+                                        utils::hide_recording_overlay(&ah);
+                                        change_tray_icon(&ah, TrayIconState::Idle);
+                                        // Bring the main window forward so the
+                                        // frontend paywall is visible even if
+                                        // the user was working in another app.
+                                        if let Some(w) = ah.get_webview_window("main") {
+                                            let _ = w.show();
+                                            let _ = w.set_focus();
+                                        }
+                                        return;
+                                    }
+                                }
+
                                 let ah_clone = ah.clone();
                                 let paste_time = Instant::now();
                                 let final_text = processed.final_text;

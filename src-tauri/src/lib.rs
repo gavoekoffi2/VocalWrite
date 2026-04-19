@@ -15,6 +15,7 @@ pub mod portable;
 mod settings;
 mod shortcut;
 mod signal_handle;
+mod subscription;
 mod transcription_coordinator;
 mod tray;
 mod tray_i18n;
@@ -426,6 +427,12 @@ pub fn run(cli_args: CliArgs) {
             commands::history::update_history_limit,
             commands::history::update_recording_retention_period,
             helpers::clamshell::is_laptop,
+            subscription::get_subscription_status,
+            subscription::record_transcription_usage,
+            subscription::activate_license,
+            subscription::deactivate_license,
+            subscription::initiate_subscription_payment,
+            subscription::check_payment_and_activate,
         ])
         .events(collect_events![managers::history::HistoryUpdatePayload,]);
 
@@ -459,11 +466,11 @@ pub fn run(cli_args: CliArgs) {
                     Target::new(if let Some(data_dir) = portable::data_dir() {
                         TargetKind::Folder {
                             path: data_dir.join("logs"),
-                            file_name: Some("handy".into()),
+                            file_name: Some("vocrit".into()),
                         }
                     } else {
                         TargetKind::LogDir {
-                            file_name: Some("handy".into()),
+                            file_name: Some("vocrit".into()),
                         }
                     })
                     .filter(|metadata| {

@@ -613,10 +613,10 @@ impl ModelManager {
     }
 
     fn migrate_bundled_models(&self) -> Result<()> {
-        // Check for bundled models and copy them to user directory
-        let bundled_models = ["ggml-small.bin"]; // Add other bundled models here if any
+        // Check for bundled file-based models and copy them to user directory.
+        let bundled_file_models = ["ggml-small.bin"];
 
-        for filename in &bundled_models {
+        for filename in &bundled_file_models {
             let bundled_path = self.app_handle.path().resolve(
                 &format!("resources/models/{}", filename),
                 tauri::path::BaseDirectory::Resource,
@@ -633,6 +633,48 @@ impl ModelManager {
                         info!("Successfully migrated {}", filename);
                     }
                 }
+            }
+        }
+
+        // Check for bundled directory-based models and copy them to user directory.
+        // Parakeet V3 is the default bundled model: fast, accurate, and supports French.
+        let bundled_directory_models = ["parakeet-tdt-0.6b-v3-int8"];
+
+        for dirname in &bundled_directory_models {
+            let bundled_path = self.app_handle.path().resolve(
+                &format!("resources/models/{}", dirname),
+                tauri::path::BaseDirectory::Resource,
+            );
+
+            if let Ok(bundled_path) = bundled_path {
+                if bundled_path.exists() && bundled_path.is_dir() {
+                    let user_path = self.models_dir.join(dirname);
+
+                    // Only copy if user doesn't already have the model.
+                    if !user_path.exists() {
+                        info!("Migrating bundled model directory {} to user directory", dirname);
+                        Self::copy_dir_recursive(&bundled_path, &user_path)?;
+                        info!("Successfully migrated {}", dirname);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn copy_dir_recursive(source: &Path, destination: &Path) -> Result<()> {
+        fs::create_dir_all(destination)?;
+
+        for entry in fs::read_dir(source)? {
+            let entry = entry?;
+            let source_path = entry.path();
+            let destination_path = destination.join(entry.file_name());
+
+            if source_path.is_dir() {
+                Self::copy_dir_recursive(&source_path, &destination_path)?;
+            } else {
+                fs::copy(&source_path, &destination_path)?;
             }
         }
 

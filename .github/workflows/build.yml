@@ -28,6 +28,34 @@ jobs:
           echo "C:\Program Files (x86)\WiX Toolset v3.11\bin" >> $env:GITHUB_PATH
       - name: Install Tauri dependencies
         run: bun install
+      - name: Bundle default French multilingual model
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $modelsDir = "src-tauri/resources/models"
+          $archive = "$env:RUNNER_TEMP/parakeet-v3-int8.tar.gz"
+          $extractDir = "$env:RUNNER_TEMP/parakeet-v3"
+          $finalDir = "$modelsDir/parakeet-tdt-0.6b-v3-int8"
+          $expectedSha256 = "43d37191602727524a7d8c6da0eef11c4ba24320f5b4730f1a2497befc2efa77"
+
+          New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
+          Invoke-WebRequest -Uri "https://blob.handy.computer/parakeet-v3-int8.tar.gz" -OutFile $archive
+
+          $actualSha256 = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash.ToLowerInvariant()
+          if ($actualSha256 -ne $expectedSha256) {
+            throw "Parakeet V3 checksum mismatch: expected $expectedSha256, got $actualSha256"
+          }
+
+          if (Test-Path $extractDir) {
+            Remove-Item -Recurse -Force $extractDir
+          }
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          tar -xzf $archive -C $extractDir
+
+          if (Test-Path $finalDir) {
+            Remove-Item -Recurse -Force $finalDir
+          }
+          Move-Item -Path "$extractDir/parakeet-tdt-0.6b-v3-int8" -Destination $finalDir
       - name: Build App
         run: bun run tauri build
       - name: Upload artifact

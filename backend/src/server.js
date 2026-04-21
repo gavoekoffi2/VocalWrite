@@ -31,7 +31,8 @@ app.get("/api/health", (_req, res) => {
  */
 app.post("/api/checkout", async (req, res) => {
   try {
-    const { email, phone, deviceId } = req.body || {};
+    const { email, phone } = req.body || {};
+    const deviceId = req.body?.device_id || req.body?.deviceId || "";
     if (!email || !phone) {
       return res.status(400).json({ error: "email and phone are required" });
     }
@@ -46,10 +47,11 @@ app.post("/api/checkout", async (req, res) => {
         tier: "admin_free",
       });
       return res.json({
-        sessionId: `admin_${nanoid(8)}`,
-        checkoutUrl: null,
+        session_id: `admin_${nanoid(8)}`,
+        checkout_url: null,
         status: "paid",
-        license,
+        email: normalisedEmail,
+        license_key: license.key,
       });
     }
 
@@ -83,8 +85,8 @@ app.post("/api/checkout", async (req, res) => {
     ).run(checkoutUrl, providerReference, sessionId);
 
     res.json({
-      sessionId,
-      checkoutUrl,
+      session_id: sessionId,
+      checkout_url: checkoutUrl,
       status: "pending",
     });
   } catch (err) {
@@ -111,17 +113,13 @@ app.get("/api/checkout/:id", (req, res) => {
   }
 
   res.json({
-    sessionId: row.id,
+    session_id: row.id,
     status: row.status,
-    checkoutUrl: row.checkout_url,
-    license: license
-      ? {
-          key: license.key,
-          tier: license.tier,
-          expiresAt: license.expires_at,
-          email: license.email,
-        }
-      : null,
+    checkout_url: row.checkout_url,
+    email: license?.email || row.email,
+    license_key: license?.key || null,
+    expires_at: license?.expires_at || null,
+    tier: license?.tier || null,
   });
 });
 

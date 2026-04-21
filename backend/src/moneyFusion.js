@@ -5,12 +5,11 @@
  * (Wave, Orange Money, MTN MoMo, Moov Money, …). Integration documentation:
  *   https://pay.moneyfusion.net/
  *
- * The real API requires a merchant API key sent in the `Authorization` header
- * and a JSON body containing at least `totalPrice`, `customer_name`,
- * `numeroSend` (phone number), and a `return_url` / `webhook_url`. Since each
- * merchant account gets a slightly different endpoint, the exact URL and
- * payload may need to be adjusted — read the dashboard's technical integration
- * page before going live.
+ * The public FusionPay examples create a payment with fields such as
+ * `total_price`, `articles`, `numero_send`, `nom_client`, `user_id`,
+ * `order_id`, and `return_url`, then return a token and hosted payment URL.
+ * Money Fusion merchant dashboards may expose account-specific API URLs, so
+ * keep the URL configurable before going live.
  *
  * This module is intentionally small so it can be swapped for another
  * aggregator (CinetPay, PayDunya, Flutterwave) by re-implementing the same
@@ -46,14 +45,19 @@ export async function createCheckout({
   }
 
   const body = {
-    totalPrice: amountXof,
+    total_price: String(amountXof),
     currency,
-    article: [
-      { designation: "Vocrit AI annual subscription", value: amountXof },
+    articles: [
+      {
+        name: "Vocrit AI annual subscription",
+        price: String(amountXof),
+        quantity: 1,
+      },
     ],
-    personal_Info: [{ userId: sessionId, orderId: sessionId }],
-    numeroSend: phone,
-    nomclient: email,
+    numero_send: phone,
+    nom_client: email,
+    user_id: sessionId,
+    order_id: sessionId,
     return_url: `${CHECKOUT_SUCCESS_URL}?session=${sessionId}`,
     cancel_url: CHECKOUT_CANCEL_URL,
     webhook_url: `${PUBLIC_BASE_URL}/api/webhook/money-fusion`,

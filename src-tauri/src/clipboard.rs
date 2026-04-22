@@ -58,7 +58,7 @@ fn restore_paste_target_window() {
     }
 
     let hwnd = HWND(raw as _);
-    if unsafe { !IsWindow(hwnd).as_bool() } {
+    if unsafe { !IsWindow(Some(hwnd)).as_bool() } {
         LAST_PASTE_TARGET_HWND.store(0, Ordering::Relaxed);
         return;
     }

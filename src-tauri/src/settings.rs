@@ -181,7 +181,7 @@ impl Default for KeyboardImplementation {
 
 impl Default for ModelUnloadTimeout {
     fn default() -> Self {
-        ModelUnloadTimeout::Min5
+        ModelUnloadTimeout::Never
     }
 }
 

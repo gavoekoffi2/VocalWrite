@@ -25,6 +25,11 @@ import {
 
 export type SidebarSection = keyof typeof SECTIONS_CONFIG;
 
+const SIDEBAR_COPY = {
+  product: "Vocrit AI",
+  tagline: "Dictée vocale prête à écrire partout.",
+} as const;
+
 interface IconProps {
   width?: number | string;
   height?: number | string;
@@ -108,34 +113,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
     .map(([id, config]) => ({ id: id as SidebarSection, ...config }));
 
   return (
-    <div className="flex flex-col w-40 h-full border-e border-mid-gray/20 items-center px-2">
-      <VocalWriteTextLogo width={120} className="m-4" />
-      <div className="flex flex-col w-full items-center gap-1 pt-2 border-t border-mid-gray/20">
+    <aside className="flex flex-col w-52 h-full rounded-[28px] border border-white/70 bg-[#19130c] text-white shadow-[0_24px_70px_rgba(28,18,8,0.24)] overflow-hidden">
+      <div className="p-4">
+        <div className="rounded-2xl bg-white px-3 py-4 shadow-inner">
+          <VocalWriteTextLogo width={132} />
+        </div>
+        <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-amber-200/80">
+            {SIDEBAR_COPY.product}
+          </p>
+          <p className="mt-1 text-sm font-semibold leading-snug">
+            {SIDEBAR_COPY.tagline}
+          </p>
+        </div>
+      </div>
+      <nav className="flex flex-col w-full gap-1 px-3 pb-3">
         {availableSections.map((section) => {
           const Icon = section.icon;
           const isActive = activeSection === section.id;
 
           return (
-            <div
+            <button
               key={section.id}
-              className={`flex gap-2 items-center p-2 w-full rounded-lg cursor-pointer transition-colors ${
+              type="button"
+              className={`flex gap-3 items-center px-3 py-2.5 w-full rounded-2xl text-left transition-all ${
                 isActive
-                  ? "bg-logo-primary/80"
-                  : "hover:bg-mid-gray/20 hover:opacity-100 opacity-85"
+                  ? "bg-amber-400 text-[#19130c] shadow-lg shadow-amber-950/20"
+                  : "text-white/75 hover:bg-white/10 hover:text-white"
               }`}
               onClick={() => onSectionChange(section.id)}
             >
-              <Icon width={24} height={24} className="shrink-0" />
+              <Icon width={20} height={20} className="shrink-0" />
               <p
-                className="text-sm font-medium truncate"
+                className="text-sm font-semibold truncate"
                 title={t(section.labelKey)}
               >
                 {t(section.labelKey)}
               </p>
-            </div>
+            </button>
           );
         })}
-      </div>
-    </div>
+      </nav>
+    </aside>
   );
 };

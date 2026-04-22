@@ -1,16 +1,32 @@
-.app-container {
-  font-family: 'Inter', sans-serif;
-  text-align: center;
-  background-color: #FFFFFF;
+@import "tailwindcss";
+
+:root {
+  --color-text: #171717;
+  --color-background: #fbf7ef;
+  --color-background-ui: #f2b705;
+  --color-logo-primary: #d97706;
+  --color-logo-stroke: #171717;
+  --color-text-stroke: #171717;
+  --color-mid-gray: #76716a;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--color-text);
+  background:
+    radial-gradient(circle at top left, rgba(242, 183, 5, 0.24), transparent 34rem),
+    linear-gradient(135deg, #fffaf0 0%, #f7efe1 45%, #efe1ce 100%);
+  font-family:
+    ui-rounded, "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
 }
 
 button {
-  font-weight: bold;
-  font-size: 20px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-button:hover {
-  transform: scale(1.05);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  font: inherit;
 }

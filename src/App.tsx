@@ -68,6 +68,16 @@ function App() {
       ]).catch((e) => {
         console.warn("Failed to initialize:", e);
       });
+      commands
+        .getCurrentModel()
+        .then((result) => {
+          if (result.status === "ok" && result.data) {
+            return commands.setActiveModel(result.data);
+          }
+        })
+        .catch((e) => {
+          console.warn("Failed to preload transcription model:", e);
+        });
       refreshAudioDevices();
       refreshOutputDevices();
     }
@@ -238,7 +248,7 @@ function App() {
   return (
     <div
       dir={direction}
-      className="h-screen flex flex-col select-none cursor-default"
+      className="h-screen flex flex-col select-none cursor-default text-text"
     >
       <Toaster
         theme="system"
@@ -253,15 +263,15 @@ function App() {
         }}
       />
       {/* Main content area that takes remaining space */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden p-3 gap-3">
         <Sidebar
           activeSection={currentSection}
           onSectionChange={setCurrentSection}
         />
         {/* Scrollable content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden rounded-[28px] border border-white/70 bg-white/70 shadow-[0_24px_70px_rgba(92,64,29,0.14)] backdrop-blur">
           <div className="flex-1 overflow-y-auto">
-            <div className="flex flex-col items-center p-4 gap-4">
+            <div className="flex flex-col items-center p-6 gap-5">
               <AccessibilityPermissions />
               {renderSettingsContent(currentSection)}
             </div>

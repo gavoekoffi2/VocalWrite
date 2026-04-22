@@ -12,6 +12,28 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 #[cfg(target_os = "linux")]
 use crate::utils::{is_kde_wayland, is_wayland};
 
+const CLIPBOARD_WRITE_VERIFY_TIMEOUT_MS: u64 = 700;
+const CLIPBOARD_WRITE_VERIFY_INTERVAL_MS: u64 = 25;
+const CLIPBOARD_RESTORE_DELAY_MS: u64 = 450;
+
+#[cfg(not(target_os = "linux"))]
+fn wait_for_clipboard_text(app_handle: &AppHandle, expected: &str) -> Result<(), String> {
+    let clipboard = app_handle.clipboard();
+    let started = std::time::Instant::now();
+
+    loop {
+        if clipboard.read_text().unwrap_or_default() == expected {
+            return Ok(());
+        }
+
+        if started.elapsed() >= Duration::from_millis(CLIPBOARD_WRITE_VERIFY_TIMEOUT_MS) {
+            return Err("Clipboard did not update before paste".into());
+        }
+
+        std::thread::sleep(Duration::from_millis(CLIPBOARD_WRITE_VERIFY_INTERVAL_MS));
+    }
+}
+
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
 fn paste_via_clipboard(
     enigo: &mut Enigo,
@@ -42,6 +64,9 @@ fn paste_via_clipboard(
 
     write_result?;
 
+    #[cfg(not(target_os = "linux"))]
+    wait_for_clipboard_text(app_handle, text)?;
+
     std::thread::sleep(Duration::from_millis(paste_delay_ms));
 
     // Send paste key combo
@@ -61,7 +86,10 @@ fn paste_via_clipboard(
         }
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+    // Many Windows apps process Ctrl+V asynchronously. Restoring the old
+    // clipboard too quickly can paste the previous clipboard content instead
+    // of the fresh transcription.
+    std::thread::sleep(std::time::Duration::from_millis(CLIPBOARD_RESTORE_DELAY_MS));
 
     // Restore original clipboard content
     // On Wayland, prefer wl-copy for better compatibility

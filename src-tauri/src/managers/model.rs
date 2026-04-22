@@ -637,8 +637,8 @@ impl ModelManager {
         }
 
         // Check for bundled directory-based models and copy them to user directory.
-        // Parakeet V3 is the default bundled model: fast, accurate, and supports French.
-        let bundled_directory_models = ["parakeet-tdt-0.6b-v3-int8"];
+        // Canary Flash is the default bundled model: much faster and supports French.
+        let bundled_directory_models = ["canary-180m-flash"];
 
         for dirname in &bundled_directory_models {
             let bundled_path = self.app_handle.path().resolve(
@@ -652,7 +652,10 @@ impl ModelManager {
 
                     // Only copy if user doesn't already have the model.
                     if !user_path.exists() {
-                        info!("Migrating bundled model directory {} to user directory", dirname);
+                        info!(
+                            "Migrating bundled model directory {} to user directory",
+                            dirname
+                        );
                         Self::copy_dir_recursive(&bundled_path, &user_path)?;
                         info!("Successfully migrated {}", dirname);
                     }
@@ -797,11 +800,17 @@ impl ModelManager {
             }
         }
 
-        // If no model is selected, pick the first downloaded one
-        if settings.selected_model.is_empty() {
-            // Find the first available (downloaded) model
+        // If no model is selected, pick the preferred bundled model first.
+        // Also migrate users from the previous bundled Parakeet default to
+        // Canary Flash because the product now prioritizes fast French dictation.
+        if settings.selected_model.is_empty() || settings.selected_model == "parakeet-tdt-0.6b-v3" {
             let models = self.available_models.lock().unwrap();
-            if let Some(available_model) = models.values().find(|model| model.is_downloaded) {
+            let available_model = models
+                .get("canary-180m-flash")
+                .filter(|model| model.is_downloaded)
+                .or_else(|| models.values().find(|model| model.is_downloaded));
+
+            if let Some(available_model) = available_model {
                 info!(
                     "Auto-selecting model: {} ({})",
                     available_model.id, available_model.name

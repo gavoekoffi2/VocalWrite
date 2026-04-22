@@ -57,7 +57,7 @@ export const GeneralSettings: React.FC = () => {
   const pushToTalk = getSetting("push_to_talk");
   const isLinux = type() === "linux";
   const currentShortcut =
-    settings?.bindings?.transcribe?.current_binding?.replaceAll("+", " + ") ||
+    settings?.bindings?.transcribe?.current_binding?.split("+").join(" + ") ||
     "Ctrl + Space";
 
   return (

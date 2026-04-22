@@ -12,6 +12,12 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 #[cfg(target_os = "linux")]
 use crate::utils::{is_kde_wayland, is_wayland};
 
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
+    VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_SHIFT, VK_V,
+};
+
 const CLIPBOARD_WRITE_VERIFY_TIMEOUT_MS: u64 = 700;
 const CLIPBOARD_WRITE_VERIFY_INTERVAL_MS: u64 = 25;
 const CLIPBOARD_RESTORE_DELAY_MS: u64 = 450;
@@ -32,6 +38,60 @@ fn wait_for_clipboard_text(app_handle: &AppHandle, expected: &str) -> Result<(),
 
         std::thread::sleep(Duration::from_millis(CLIPBOARD_WRITE_VERIFY_INTERVAL_MS));
     }
+}
+
+#[cfg(target_os = "windows")]
+fn keyboard_input(key: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: key,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn send_key_combo_windows(paste_method: &PasteMethod) -> Result<bool, String> {
+    let inputs: Vec<INPUT> = match paste_method {
+        PasteMethod::CtrlV => vec![
+            keyboard_input(VK_CONTROL, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_V, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_V, KEYEVENTF_KEYUP),
+            keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+        ],
+        PasteMethod::CtrlShiftV => vec![
+            keyboard_input(VK_CONTROL, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_SHIFT, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_V, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_V, KEYEVENTF_KEYUP),
+            keyboard_input(VK_SHIFT, KEYEVENTF_KEYUP),
+            keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+        ],
+        PasteMethod::ShiftInsert => vec![
+            keyboard_input(VK_SHIFT, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_INSERT, KEYBD_EVENT_FLAGS(0)),
+            keyboard_input(VK_INSERT, KEYEVENTF_KEYUP),
+            keyboard_input(VK_SHIFT, KEYEVENTF_KEYUP),
+        ],
+        _ => return Ok(false),
+    };
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        return Err(format!(
+            "Windows SendInput sent {} of {} keyboard events",
+            sent,
+            inputs.len()
+        ));
+    }
+
+    Ok(true)
 }
 
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
@@ -67,13 +127,17 @@ fn paste_via_clipboard(
     #[cfg(not(target_os = "linux"))]
     wait_for_clipboard_text(app_handle, text)?;
 
-    std::thread::sleep(Duration::from_millis(paste_delay_ms));
+    std::thread::sleep(Duration::from_millis(paste_delay_ms.max(120)));
 
     // Send paste key combo
     #[cfg(target_os = "linux")]
     let key_combo_sent = try_send_key_combo_linux(paste_method)?;
 
+    #[cfg(target_os = "windows")]
+    let key_combo_sent = send_key_combo_windows(paste_method)?;
+
     #[cfg(not(target_os = "linux"))]
+    #[cfg(not(target_os = "windows"))]
     let key_combo_sent = false;
 
     // Fall back to enigo if no native tool handled it

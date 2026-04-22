@@ -13,14 +13,65 @@ use tauri_plugin_clipboard_manager::ClipboardExt;
 use crate::utils::{is_kde_wayland, is_wayland};
 
 #[cfg(target_os = "windows")]
+use std::sync::atomic::{AtomicIsize, Ordering};
+
+#[cfg(target_os = "windows")]
+use windows::Win32::Foundation::HWND;
+
+#[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_SHIFT, VK_V,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_MENU, VK_SHIFT, VK_V,
+};
+
+#[cfg(target_os = "windows")]
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetForegroundWindow, IsIconic, IsWindow, SetForegroundWindow, ShowWindow, SW_RESTORE,
 };
 
 const CLIPBOARD_WRITE_VERIFY_TIMEOUT_MS: u64 = 700;
 const CLIPBOARD_WRITE_VERIFY_INTERVAL_MS: u64 = 25;
 const CLIPBOARD_RESTORE_DELAY_MS: u64 = 450;
+
+#[cfg(target_os = "windows")]
+static LAST_PASTE_TARGET_HWND: AtomicIsize = AtomicIsize::new(0);
+
+#[cfg(target_os = "windows")]
+pub(crate) fn remember_paste_target_window() {
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.0.is_null() {
+        return;
+    }
+
+    LAST_PASTE_TARGET_HWND.store(hwnd.0 as isize, Ordering::Relaxed);
+    info!("Remembered Windows paste target HWND {:?}", hwnd);
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn remember_paste_target_window() {}
+
+#[cfg(target_os = "windows")]
+fn restore_paste_target_window() {
+    let raw = LAST_PASTE_TARGET_HWND.load(Ordering::Relaxed);
+    if raw == 0 {
+        return;
+    }
+
+    let hwnd = HWND(raw as _);
+    if unsafe { !IsWindow(hwnd).as_bool() } {
+        LAST_PASTE_TARGET_HWND.store(0, Ordering::Relaxed);
+        return;
+    }
+
+    unsafe {
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let _ = SetForegroundWindow(hwnd);
+    }
+
+    std::thread::sleep(Duration::from_millis(120));
+}
 
 #[cfg(not(target_os = "linux"))]
 fn wait_for_clipboard_text(app_handle: &AppHandle, expected: &str) -> Result<(), String> {
@@ -58,6 +109,11 @@ fn keyboard_input(key: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS) -> INPUT {
 
 #[cfg(target_os = "windows")]
 fn send_key_combo_windows(paste_method: &PasteMethod) -> Result<bool, String> {
+    // A push-to-talk shortcut can leave modifier keys logically down for a
+    // moment. Release the common modifiers so Ctrl+V is not combined with the
+    // user's shortcut modifiers.
+    release_windows_modifiers()?;
+
     let inputs: Vec<INPUT> = match paste_method {
         PasteMethod::CtrlV => vec![
             keyboard_input(VK_CONTROL, KEYBD_EVENT_FLAGS(0)),
@@ -94,6 +150,72 @@ fn send_key_combo_windows(paste_method: &PasteMethod) -> Result<bool, String> {
     Ok(true)
 }
 
+#[cfg(target_os = "windows")]
+fn release_windows_modifiers() -> Result<(), String> {
+    let inputs = [
+        keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+        keyboard_input(VK_SHIFT, KEYEVENTF_KEYUP),
+        keyboard_input(VK_MENU, KEYEVENTF_KEYUP),
+    ];
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        return Err(format!(
+            "Windows SendInput released {} of {} modifier events",
+            sent,
+            inputs.len()
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn unicode_input(unit: u16, flags: KEYBD_EVENT_FLAGS) -> INPUT {
+    INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT {
+                wVk: VIRTUAL_KEY(0),
+                wScan: unit,
+                dwFlags: KEYBD_EVENT_FLAGS(KEYEVENTF_UNICODE.0 | flags.0),
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn type_text_direct_windows(text: &str) -> Result<(), String> {
+    restore_paste_target_window();
+    release_windows_modifiers()?;
+
+    let mut inputs = Vec::with_capacity(text.encode_utf16().count() * 2);
+    for unit in text.encode_utf16() {
+        inputs.push(unicode_input(unit, KEY_EVENT_FLAGS_EMPTY));
+        inputs.push(unicode_input(unit, KEYEVENTF_KEYUP));
+    }
+
+    if inputs.is_empty() {
+        return Ok(());
+    }
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        return Err(format!(
+            "Windows SendInput typed {} of {} unicode events",
+            sent,
+            inputs.len()
+        ));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+const KEY_EVENT_FLAGS_EMPTY: KEYBD_EVENT_FLAGS = KEYBD_EVENT_FLAGS(0);
+
 /// Pastes text using the clipboard: saves current content, writes text, sends paste keystroke, restores clipboard.
 fn paste_via_clipboard(
     enigo: &mut Enigo,
@@ -128,6 +250,9 @@ fn paste_via_clipboard(
     wait_for_clipboard_text(app_handle, text)?;
 
     std::thread::sleep(Duration::from_millis(paste_delay_ms.max(120)));
+
+    #[cfg(target_os = "windows")]
+    restore_paste_target_window();
 
     // Send paste key combo
     #[cfg(target_os = "linux")]
@@ -622,6 +747,19 @@ fn paste_direct(
     text: &str,
     #[cfg(target_os = "linux")] typing_tool: TypingTool,
 ) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        match type_text_direct_windows(text) {
+            Ok(()) => return Ok(()),
+            Err(err) => {
+                info!(
+                    "Native Windows direct text input failed, falling back to enigo: {}",
+                    err
+                );
+            }
+        }
+    }
+
     #[cfg(target_os = "linux")]
     {
         if try_direct_typing_linux(text, typing_tool)? {
@@ -682,8 +820,24 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
 
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let settings = get_settings(&app_handle);
-    let paste_method = settings.paste_method;
+    let mut paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
+
+    #[cfg(target_os = "windows")]
+    {
+        // Existing installations may still have a clipboard/none method saved
+        // from earlier builds. Windows Unicode input is more reliable for the
+        // app's core promise: put the transcript directly where the cursor is.
+        if matches!(
+            paste_method,
+            PasteMethod::None
+                | PasteMethod::CtrlV
+                | PasteMethod::CtrlShiftV
+                | PasteMethod::ShiftInsert
+        ) {
+            paste_method = PasteMethod::Direct;
+        }
+    }
 
     // Append trailing space if setting is enabled
     let text = if settings.append_trailing_space {

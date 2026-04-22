@@ -381,6 +381,7 @@ impl ShortcutAction for TranscribeAction {
 
         let binding_id = binding_id.to_string();
         change_tray_icon(app, TrayIconState::Recording);
+        crate::clipboard::remember_paste_target_window();
         show_recording_overlay(app);
 
         // Get the microphone mode to determine audio feedback timing
@@ -590,7 +591,8 @@ impl ShortcutAction for TranscribeAction {
                                     Err(msg) => {
                                         warn!("Paste blocked by quota: {msg}");
                                         use tauri_plugin_clipboard_manager::ClipboardExt;
-                                        let _ = ah.clipboard().write_text(processed.final_text.clone());
+                                        let _ =
+                                            ah.clipboard().write_text(processed.final_text.clone());
                                         let _ = ah.emit(
                                             "subscription-paywall-required",
                                             serde_json::json!({

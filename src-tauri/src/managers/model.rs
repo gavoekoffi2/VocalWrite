@@ -182,7 +182,8 @@ impl ModelManager {
             ModelInfo {
                 id: "turbo".to_string(),
                 name: "Whisper Turbo".to_string(),
-                description: "Balanced accuracy and speed.".to_string(),
+                description: "Recommended for multilingual dictation, especially French."
+                    .to_string(),
                 filename: "ggml-large-v3-turbo.bin".to_string(),
                 url: Some("https://blob.handy.computer/ggml-large-v3-turbo.bin".to_string()),
                 sha256: Some(
@@ -197,7 +198,7 @@ impl ModelManager {
                 accuracy_score: 0.80,
                 speed_score: 0.40,
                 supports_translation: false, // Turbo doesn't support translation
-                is_recommended: false,
+                is_recommended: true,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -614,7 +615,7 @@ impl ModelManager {
 
     fn migrate_bundled_models(&self) -> Result<()> {
         // Check for bundled file-based models and copy them to user directory.
-        let bundled_file_models = ["ggml-small.bin"];
+        let bundled_file_models = ["ggml-small.bin", "ggml-large-v3-turbo.bin"];
 
         for filename in &bundled_file_models {
             let bundled_path = self.app_handle.path().resolve(
@@ -637,7 +638,7 @@ impl ModelManager {
         }
 
         // Check for bundled directory-based models and copy them to user directory.
-        // Canary Flash is the default bundled model: much faster and supports French.
+        // Keep the legacy Canary bundle migration so older installs can still be upgraded.
         let bundled_directory_models = ["canary-180m-flash"];
 
         for dirname in &bundled_directory_models {
@@ -800,15 +801,37 @@ impl ModelManager {
             }
         }
 
+        let prefers_french_multilingual = settings.selected_language == "fr"
+            || settings.app_language.to_lowercase().starts_with("fr");
+        let should_prefer_turbo = settings.selected_model.is_empty()
+            || settings.selected_model == "parakeet-tdt-0.6b-v3"
+            || (prefers_french_multilingual && settings.selected_model == "canary-180m-flash");
+
         // If no model is selected, pick the preferred bundled model first.
-        // Also migrate users from the previous bundled Parakeet default to
-        // Canary Flash because the product now prioritizes fast French dictation.
-        if settings.selected_model.is_empty() || settings.selected_model == "parakeet-tdt-0.6b-v3" {
+        // French installs now prefer Whisper Turbo when it is available.
+        if should_prefer_turbo {
             let models = self.available_models.lock().unwrap();
-            let available_model = models
-                .get("canary-180m-flash")
-                .filter(|model| model.is_downloaded)
-                .or_else(|| models.values().find(|model| model.is_downloaded));
+            let available_model = if prefers_french_multilingual {
+                models
+                    .get("turbo")
+                    .filter(|model| model.is_downloaded)
+                    .or_else(|| {
+                        models
+                            .get("canary-180m-flash")
+                            .filter(|model| model.is_downloaded)
+                    })
+                    .or_else(|| models.values().find(|model| model.is_downloaded))
+            } else {
+                models
+                    .get("canary-180m-flash")
+                    .filter(|model| model.is_downloaded)
+                    .or_else(|| {
+                        models
+                            .get("turbo")
+                            .filter(|model| model.is_downloaded)
+                    })
+                    .or_else(|| models.values().find(|model| model.is_downloaded))
+            };
 
             if let Some(available_model) = available_model {
                 info!(

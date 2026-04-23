@@ -120,6 +120,14 @@ pub fn switch_active_model(app: &AppHandle, model_id: &str) -> Result<(), String
         settings.selected_language = "auto".to_string();
     }
 
+    if settings.translate_to_english && !model_info.supports_translation {
+        log::info!(
+            "Disabling translate_to_english because model '{}' does not support translation",
+            model_id
+        );
+        settings.translate_to_english = false;
+    }
+
     write_settings(app, settings);
 
     // Skip eager loading if unload is set to "Immediately" — the model

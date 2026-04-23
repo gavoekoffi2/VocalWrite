@@ -444,6 +444,33 @@ fn default_translate_to_english() -> bool {
     false
 }
 
+fn infer_transcription_language(locale: &str) -> Option<String> {
+    let normalized = locale.trim().replace('_', "-").to_lowercase();
+    if normalized.is_empty() {
+        return None;
+    }
+
+    if normalized.starts_with("zh-hant")
+        || normalized.ends_with("-tw")
+        || normalized.ends_with("-hk")
+        || normalized.ends_with("-mo")
+    {
+        return Some("zh-Hant".to_string());
+    }
+
+    if normalized.starts_with("zh") {
+        return Some("zh-Hans".to_string());
+    }
+
+    let base = normalized.split('-').next().unwrap_or_default();
+    match base {
+        "fr" | "en" | "es" | "de" | "it" | "pt" | "nl" | "ru" | "uk" | "ar" | "ja" | "ko"
+        | "tr" | "pl" | "sv" | "da" | "fi" | "no" | "cs" | "ro" | "hu" | "el" | "bg"
+        | "hr" | "sk" | "sl" | "et" | "lv" | "lt" => Some(base.to_string()),
+        _ => None,
+    }
+}
+
 fn default_start_hidden() -> bool {
     false
 }
@@ -457,7 +484,7 @@ fn default_update_checks_enabled() -> bool {
 }
 
 fn default_selected_language() -> String {
-    "auto".to_string()
+    infer_transcription_language(&default_app_language()).unwrap_or_else(|| "auto".to_string())
 }
 
 fn default_overlay_position() -> OverlayPosition {
@@ -702,6 +729,23 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
 
 fn normalize_platform_settings(settings: &mut AppSettings) -> bool {
     let mut changed = false;
+
+    if settings.selected_language == "auto" {
+        if let Some(language) = infer_transcription_language(&settings.app_language) {
+            debug!(
+                "Migrating transcription language from auto to '{}' based on app language '{}'",
+                language, settings.app_language
+            );
+            settings.selected_language = language;
+            changed = true;
+        }
+    }
+
+    if settings.app_language.to_lowercase().starts_with("fr") && settings.translate_to_english {
+        debug!("Disabling translate_to_english for French locale settings");
+        settings.translate_to_english = false;
+        changed = true;
+    }
 
     #[cfg(target_os = "windows")]
     {

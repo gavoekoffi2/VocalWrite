@@ -139,10 +139,9 @@ fn should_force_show_permissions_window(app: &AppHandle) -> bool {
 }
 
 fn initialize_core_logic(app_handle: &AppHandle) {
-    // Note: Enigo (keyboard/mouse simulation) is NOT initialized here.
-    // The frontend is responsible for calling the `initialize_enigo` command
-    // after onboarding completes. This avoids triggering permission dialogs
-    // on macOS before the user is ready.
+    // On macOS, the frontend initializes input after accessibility onboarding.
+    // Windows has no equivalent accessibility gate, so we initialize below at
+    // startup to keep hotkeys and text insertion available even if the UI is hidden.
 
     // Initialize the managers
     let recording_manager = Arc::new(
@@ -166,10 +165,31 @@ fn initialize_core_logic(app_handle: &AppHandle) {
     app_handle.manage(transcription_manager.clone());
     app_handle.manage(history_manager.clone());
 
-    // Note: Shortcuts are NOT initialized here.
-    // The frontend is responsible for calling the `initialize_shortcuts` command
-    // after permissions are confirmed (on macOS) or after onboarding completes.
-    // This matches the pattern used for Enigo initialization.
+    // On non-Windows platforms, shortcuts are initialized by the frontend after
+    // permissions/onboarding. Windows initializes them immediately below.
+    #[cfg(target_os = "windows")]
+    {
+        if app_handle.try_state::<input::EnigoState>().is_none() {
+            match input::EnigoState::new() {
+                Ok(enigo_state) => {
+                    app_handle.manage(enigo_state);
+                    log::info!("Windows input system initialized during startup");
+                }
+                Err(err) => {
+                    log::warn!("Windows input system startup initialization failed: {err}");
+                }
+            }
+        }
+
+        if app_handle
+            .try_state::<commands::ShortcutsInitialized>()
+            .is_none()
+        {
+            shortcut::init_shortcuts(app_handle);
+            app_handle.manage(commands::ShortcutsInitialized);
+            log::info!("Windows shortcuts initialized during startup");
+        }
+    }
 
     #[cfg(unix)]
     let signals = Signals::new(&[SIGUSR1, SIGUSR2]).unwrap();

@@ -172,9 +172,9 @@ pub enum KeyboardImplementation {
 
 impl Default for KeyboardImplementation {
     fn default() -> Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         return KeyboardImplementation::Tauri;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         return KeyboardImplementation::VocalWriteKeys;
     }
 }
@@ -700,6 +700,21 @@ fn ensure_post_process_defaults(settings: &mut AppSettings) -> bool {
     changed
 }
 
+fn normalize_platform_settings(settings: &mut AppSettings) -> bool {
+    let mut changed = false;
+
+    #[cfg(target_os = "windows")]
+    {
+        if settings.keyboard_implementation == KeyboardImplementation::VocalWriteKeys {
+            debug!("Migrating Windows keyboard implementation from VocalWriteKeys to Tauri");
+            settings.keyboard_implementation = KeyboardImplementation::Tauri;
+            changed = true;
+        }
+    }
+
+    changed
+}
+
 pub const SETTINGS_STORE_PATH: &str = "settings_store.json";
 
 pub fn get_default_settings() -> AppSettings {
@@ -874,7 +889,9 @@ pub fn load_or_create_app_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings) {
+    let mut changed = ensure_post_process_defaults(&mut settings);
+    changed |= normalize_platform_settings(&mut settings);
+    if changed {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 
@@ -898,7 +915,9 @@ pub fn get_settings(app: &AppHandle) -> AppSettings {
         default_settings
     };
 
-    if ensure_post_process_defaults(&mut settings) {
+    let mut changed = ensure_post_process_defaults(&mut settings);
+    changed |= normalize_platform_settings(&mut settings);
+    if changed {
         store.set("settings", serde_json::to_value(&settings).unwrap());
     }
 

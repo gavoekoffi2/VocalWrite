@@ -21,7 +21,7 @@ use windows::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP,
-    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_MENU, VK_SHIFT, VK_V,
+    KEYEVENTF_UNICODE, VIRTUAL_KEY, VK_CONTROL, VK_INSERT, VK_MENU, VK_RETURN, VK_SHIFT, VK_V,
 };
 
 #[cfg(target_os = "windows")]
@@ -818,6 +818,41 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
     auto_submit && paste_method != PasteMethod::None
 }
 
+#[cfg(target_os = "windows")]
+fn send_return_key_windows(key_type: AutoSubmitKey) -> Result<(), String> {
+    release_windows_modifiers()?;
+
+    let inputs = match key_type {
+        AutoSubmitKey::Enter => vec![
+            keyboard_input(VK_RETURN, KEY_EVENT_FLAGS_EMPTY),
+            keyboard_input(VK_RETURN, KEYEVENTF_KEYUP),
+        ],
+        AutoSubmitKey::CtrlEnter => vec![
+            keyboard_input(VK_CONTROL, KEY_EVENT_FLAGS_EMPTY),
+            keyboard_input(VK_RETURN, KEY_EVENT_FLAGS_EMPTY),
+            keyboard_input(VK_RETURN, KEYEVENTF_KEYUP),
+            keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+        ],
+        AutoSubmitKey::CmdEnter => vec![
+            keyboard_input(VK_CONTROL, KEY_EVENT_FLAGS_EMPTY),
+            keyboard_input(VK_RETURN, KEY_EVENT_FLAGS_EMPTY),
+            keyboard_input(VK_RETURN, KEYEVENTF_KEYUP),
+            keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP),
+        ],
+    };
+
+    let sent = unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+    if sent != inputs.len() as u32 {
+        return Err(format!(
+            "Windows SendInput sent {} of {} auto-submit events",
+            sent,
+            inputs.len()
+        ));
+    }
+
+    Ok(())
+}
+
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
     let settings = get_settings(&app_handle);
     let mut paste_method = settings.paste_method;
@@ -850,6 +885,25 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
         "Using paste method: {:?}, delay: {}ms",
         paste_method, paste_delay_ms
     );
+
+    #[cfg(target_os = "windows")]
+    if paste_method == PasteMethod::Direct {
+        type_text_direct_windows(&text)?;
+
+        if should_send_auto_submit(settings.auto_submit, paste_method) {
+            std::thread::sleep(Duration::from_millis(50));
+            send_return_key_windows(settings.auto_submit_key)?;
+        }
+
+        if settings.clipboard_handling == ClipboardHandling::CopyToClipboard {
+            let clipboard = app_handle.clipboard();
+            clipboard
+                .write_text(&text)
+                .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
+        }
+
+        return Ok(());
+    }
 
     // Get the managed Enigo instance
     let enigo_state = app_handle

@@ -38,6 +38,59 @@ impl Drop for FinishGuard {
     }
 }
 
+fn save_history_after_paste(
+    hm: Arc<HistoryManager>,
+    samples: Vec<f32>,
+    file_name: String,
+    transcription: String,
+    post_process: bool,
+    post_processed_text: Option<String>,
+    post_process_prompt: Option<String>,
+) {
+    tauri::async_runtime::spawn(async move {
+        let sample_count = samples.len();
+        let wav_path = hm.recordings_dir().join(&file_name);
+        let wav_path_for_verify = wav_path.clone();
+
+        let wav_saved = match tauri::async_runtime::spawn_blocking(move || {
+            crate::audio_toolkit::save_wav_file(&wav_path, &samples)
+        })
+        .await
+        {
+            Ok(Ok(())) => match crate::audio_toolkit::verify_wav_file(
+                &wav_path_for_verify,
+                sample_count,
+            ) {
+                Ok(()) => true,
+                Err(e) => {
+                    error!("WAV verification failed: {}", e);
+                    false
+                }
+            },
+            Ok(Err(e)) => {
+                error!("Failed to save WAV file: {}", e);
+                false
+            }
+            Err(e) => {
+                error!("WAV save task panicked: {}", e);
+                false
+            }
+        };
+
+        if wav_saved {
+            if let Err(err) = hm.save_entry(
+                file_name,
+                transcription,
+                post_process,
+                post_processed_text,
+                post_process_prompt,
+            ) {
+                error!("Failed to save history entry: {}", err);
+            }
+        }
+    });
+}
+
 // Shortcut Action Trait
 pub trait ShortcutAction: Send + Sync {
     fn start(&self, app: &AppHandle, binding_id: &str, shortcut_str: &str);
@@ -509,43 +562,14 @@ impl ShortcutAction for TranscribeAction {
                     utils::hide_recording_overlay(&ah);
                     change_tray_icon(&ah, TrayIconState::Idle);
                 } else {
-                    // Save WAV concurrently with transcription
-                    let sample_count = samples.len();
                     let file_name = format!("vocrit-{}.wav", chrono::Utc::now().timestamp());
-                    let wav_path = hm.recordings_dir().join(&file_name);
-                    let wav_path_for_verify = wav_path.clone();
-                    let samples_for_wav = samples.clone();
-                    let wav_handle = tauri::async_runtime::spawn_blocking(move || {
-                        crate::audio_toolkit::save_wav_file(&wav_path, &samples_for_wav)
-                    });
 
-                    // Transcribe concurrently with WAV save
+                    // Keep disk I/O out of the critical path: the text should
+                    // be pasted as soon as transcription and optional
+                    // post-processing finish. History/WAV persistence happens
+                    // after paste in a background task.
                     let transcription_time = Instant::now();
-                    let transcription_result = tm.transcribe(samples);
-
-                    // Await WAV save and verify
-                    let wav_saved = match wav_handle.await {
-                        Ok(Ok(())) => {
-                            match crate::audio_toolkit::verify_wav_file(
-                                &wav_path_for_verify,
-                                sample_count,
-                            ) {
-                                Ok(()) => true,
-                                Err(e) => {
-                                    error!("WAV verification failed: {}", e);
-                                    false
-                                }
-                            }
-                        }
-                        Ok(Err(e)) => {
-                            error!("Failed to save WAV file: {}", e);
-                            false
-                        }
-                        Err(e) => {
-                            error!("WAV save task panicked: {}", e);
-                            false
-                        }
-                    };
+                    let transcription_result = tm.transcribe(samples.clone());
 
                     match transcription_result {
                         Ok(transcription) => {
@@ -562,18 +586,15 @@ impl ShortcutAction for TranscribeAction {
                                 process_transcription_output(&ah, &transcription, post_process)
                                     .await;
 
-                            // Save to history if WAV was saved
-                            if wav_saved {
-                                if let Err(err) = hm.save_entry(
-                                    file_name,
-                                    transcription,
-                                    post_process,
-                                    processed.post_processed_text.clone(),
-                                    processed.post_process_prompt.clone(),
-                                ) {
-                                    error!("Failed to save history entry: {}", err);
-                                }
-                            }
+                            save_history_after_paste(
+                                Arc::clone(&hm),
+                                samples,
+                                file_name,
+                                transcription,
+                                post_process,
+                                processed.post_processed_text.clone(),
+                                processed.post_process_prompt.clone(),
+                            );
 
                             if processed.final_text.is_empty() {
                                 utils::hide_recording_overlay(&ah);
@@ -637,18 +658,17 @@ impl ShortcutAction for TranscribeAction {
                         }
                         Err(err) => {
                             debug!("Global Shortcut Transcription error: {}", err);
-                            // Save entry with empty text so user can retry
-                            if wav_saved {
-                                if let Err(save_err) = hm.save_entry(
-                                    file_name,
-                                    String::new(),
-                                    post_process,
-                                    None,
-                                    None,
-                                ) {
-                                    error!("Failed to save failed history entry: {}", save_err);
-                                }
-                            }
+                            // Save the failed recording in the background so the
+                            // user can retry without slowing the UI path.
+                            save_history_after_paste(
+                                Arc::clone(&hm),
+                                samples,
+                                file_name,
+                                String::new(),
+                                post_process,
+                                None,
+                                None,
+                            );
                             utils::hide_recording_overlay(&ah);
                             change_tray_icon(&ah, TrayIconState::Idle);
                         }

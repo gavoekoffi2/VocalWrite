@@ -409,7 +409,7 @@ pub struct AppSettings {
     pub app_language: String,
     #[serde(default)]
     pub experimental_enabled: bool,
-    #[serde(default)]
+    #[serde(default = "default_lazy_stream_close")]
     pub lazy_stream_close: bool,
     #[serde(default)]
     pub keyboard_implementation: KeyboardImplementation,
@@ -465,8 +465,8 @@ fn infer_transcription_language(locale: &str) -> Option<String> {
     let base = normalized.split('-').next().unwrap_or_default();
     match base {
         "fr" | "en" | "es" | "de" | "it" | "pt" | "nl" | "ru" | "uk" | "ar" | "ja" | "ko"
-        | "tr" | "pl" | "sv" | "da" | "fi" | "no" | "cs" | "ro" | "hu" | "el" | "bg"
-        | "hr" | "sk" | "sl" | "et" | "lv" | "lt" => Some(base.to_string()),
+        | "tr" | "pl" | "sv" | "da" | "fi" | "no" | "cs" | "ro" | "hu" | "el" | "bg" | "hr"
+        | "sk" | "sl" | "et" | "lv" | "lt" => Some(base.to_string()),
         _ => None,
     }
 }
@@ -520,6 +520,10 @@ fn default_history_limit() -> usize {
 
 fn default_recording_retention_period() -> RecordingRetentionPeriod {
     RecordingRetentionPeriod::PreserveLimit
+}
+
+fn default_lazy_stream_close() -> bool {
+    true
 }
 
 fn default_audio_feedback_volume() -> f32 {
@@ -747,6 +751,12 @@ fn normalize_platform_settings(settings: &mut AppSettings) -> bool {
         changed = true;
     }
 
+    if !settings.lazy_stream_close {
+        debug!("Enabling lazy_stream_close to reduce repeated dictation latency");
+        settings.lazy_stream_close = true;
+        changed = true;
+    }
+
     #[cfg(target_os = "windows")]
     {
         if settings.keyboard_implementation == KeyboardImplementation::VocalWriteKeys {
@@ -852,7 +862,7 @@ pub fn get_default_settings() -> AppSettings {
         append_trailing_space: false,
         app_language: default_app_language(),
         experimental_enabled: false,
-        lazy_stream_close: false,
+        lazy_stream_close: default_lazy_stream_close(),
         keyboard_implementation: KeyboardImplementation::default(),
         show_tray_icon: default_show_tray_icon(),
         paste_delay_ms: default_paste_delay_ms(),

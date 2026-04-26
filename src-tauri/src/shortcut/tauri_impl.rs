@@ -3,7 +3,7 @@
 //! This module provides shortcut functionality using Tauri's built-in
 //! global-shortcut plugin.
 
-use log::{error, warn};
+use log::{error, info, warn};
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
@@ -93,11 +93,19 @@ pub fn register_shortcut(app: &AppHandle, binding: ShortcutBinding) -> Result<()
         }
     };
 
-    // Prevent duplicate registrations that would silently shadow one another
+    // Refresh registrations created by an earlier initialization pass. Windows
+    // can call shortcut init from both backend startup and the frontend.
     if app.global_shortcut().is_registered(shortcut) {
-        let error_msg = format!("Shortcut '{}' is already in use", binding.current_binding);
-        warn!("register_tauri_shortcut duplicate error: {}", error_msg);
-        return Err(error_msg);
+        info!(
+            "Shortcut '{}' was already registered; refreshing registration",
+            binding.current_binding
+        );
+        if let Err(e) = app.global_shortcut().unregister(shortcut) {
+            warn!(
+                "Failed to refresh existing shortcut '{}': {}",
+                binding.current_binding, e
+            );
+        }
     }
 
     // Clone binding.id for use in the closure

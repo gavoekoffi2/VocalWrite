@@ -198,7 +198,7 @@ impl ModelManager {
                 accuracy_score: 0.80,
                 speed_score: 0.40,
                 supports_translation: false, // Turbo doesn't support translation
-                is_recommended: true,
+                is_recommended: false,
                 supported_languages: whisper_languages.clone(),
                 supports_language_selection: true,
                 is_custom: false,
@@ -531,7 +531,7 @@ impl ModelManager {
                 accuracy_score: 0.75,
                 speed_score: 0.85,
                 supports_translation: true,
-                is_recommended: false,
+                is_recommended: true,
                 supported_languages: canary_flash_languages,
                 supports_language_selection: true,
                 is_custom: false,
@@ -615,7 +615,7 @@ impl ModelManager {
 
     fn migrate_bundled_models(&self) -> Result<()> {
         // Check for bundled file-based models and copy them to user directory.
-        let bundled_file_models = ["ggml-small.bin", "ggml-large-v3-turbo.bin"];
+        let bundled_file_models = ["ggml-small.bin"];
 
         for filename in &bundled_file_models {
             let bundled_path = self.app_handle.path().resolve(
@@ -801,37 +801,19 @@ impl ModelManager {
             }
         }
 
-        let prefers_french_multilingual = settings.selected_language == "fr"
-            || settings.app_language.to_lowercase().starts_with("fr");
-        let should_prefer_turbo = settings.selected_model.is_empty()
-            || settings.selected_model == "parakeet-tdt-0.6b-v3"
-            || (prefers_french_multilingual && settings.selected_model == "canary-180m-flash");
-
         // If no model is selected, pick the preferred bundled model first.
-        // French installs now prefer Whisper Turbo when it is available.
-        if should_prefer_turbo {
+        // Also migrate bundled defaults that proved too slow for mainstream
+        // Windows machines back to the fast French-capable model.
+        let should_prefer_fast_default = settings.selected_model.is_empty()
+            || settings.selected_model == "parakeet-tdt-0.6b-v3"
+            || settings.selected_model == "turbo";
+
+        if should_prefer_fast_default {
             let models = self.available_models.lock().unwrap();
-            let available_model = if prefers_french_multilingual {
-                models
-                    .get("turbo")
-                    .filter(|model| model.is_downloaded)
-                    .or_else(|| {
-                        models
-                            .get("canary-180m-flash")
-                            .filter(|model| model.is_downloaded)
-                    })
-                    .or_else(|| models.values().find(|model| model.is_downloaded))
-            } else {
-                models
-                    .get("canary-180m-flash")
-                    .filter(|model| model.is_downloaded)
-                    .or_else(|| {
-                        models
-                            .get("turbo")
-                            .filter(|model| model.is_downloaded)
-                    })
-                    .or_else(|| models.values().find(|model| model.is_downloaded))
-            };
+            let available_model = models
+                .get("canary-180m-flash")
+                .filter(|model| model.is_downloaded)
+                .or_else(|| models.values().find(|model| model.is_downloaded));
 
             if let Some(available_model) = available_model {
                 info!(

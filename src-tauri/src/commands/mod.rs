@@ -170,8 +170,12 @@ pub struct ShortcutsInitialized;
 #[specta::specta]
 #[tauri::command]
 pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
-    // Check if already initialized
-    if app.try_state::<ShortcutsInitialized>().is_some() {
+    let already_initialized = app.try_state::<ShortcutsInitialized>().is_some();
+
+    // Windows refreshes registrations because startup and frontend init can run
+    // at different times, and global shortcuts occasionally need a second pass.
+    #[cfg(not(target_os = "windows"))]
+    if already_initialized {
         log::debug!("Shortcuts already initialized");
         return Ok(());
     }
@@ -180,7 +184,9 @@ pub fn initialize_shortcuts(app: AppHandle) -> Result<(), String> {
     crate::shortcut::init_shortcuts(&app);
 
     // Mark as initialized
-    app.manage(ShortcutsInitialized);
+    if !already_initialized {
+        app.manage(ShortcutsInitialized);
+    }
 
     log::info!("Shortcuts initialized successfully");
     Ok(())
